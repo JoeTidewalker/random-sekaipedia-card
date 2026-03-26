@@ -5,7 +5,7 @@
   <title>Random Sekaipedia Card</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
+      font-family: Arial;
       text-align: center;
       margin-top: 15%;
       background: #f5f5f5;
@@ -13,54 +13,61 @@
     button {
       font-size: 20px;
       padding: 15px 30px;
-      cursor: pointer;
       border: none;
       border-radius: 8px;
       background-color: #4CAF50;
       color: white;
+      cursor: pointer;
     }
-    button:hover {
-      background-color: #45a049;
-    }
-    p {
-      margin-top: 20px;
-      color: #555;
-    }
+    p { margin-top: 20px; color: #555; }
   </style>
 </head>
 <body>
 
-  <h1>🎴 Get random card</h1>
-  <button onclick="getRandomCard()">Get Random Card</button>
+  <h1>🎴 Random Card Generator</h1>
+  <button onclick="go()">Get Random Card</button>
   <p id="status"></p>
 
   <script>
-    async function getRandomCard() {
+    async function go() {
       const status = document.getElementById("status");
-      status.textContent = "Loading cards...";
-
-      let allPages = [];
-      let cmcontinue = "";
+      status.textContent = "Loading card list...";
 
       try {
-        do {
-          let url = `https://www.sekaipedia.org/api.php?action=query&list=categorymembers&cmtitle=Category:Cards&cmlimit=500&format=json&origin=*${cmcontinue ? "&cmcontinue=" + cmcontinue : ""}`;
-          let res = await fetch(url);
-          let data = await res.json();
+        // Fetch the full list page (HTML, not API → no CORS block)
+        let res = await fetch("https://corsproxy.io/?https://www.sekaipedia.org/wiki/List_of_cards");
+        let html = await res.text();
 
-          allPages.push(...data.query.categorymembers);
-          cmcontinue = data.continue ? data.continue.cmcontinue : "";
+        // Parse HTML
+        let parser = new DOMParser();
+        let doc = parser.parseFromString(html, "text/html");
 
-        } while (cmcontinue);
+        // Get all links
+        let links = [...doc.querySelectorAll("a")];
+
+        // Filter valid card links
+        let cardLinks = links
+          .map(a => a.getAttribute("href"))
+          .filter(href =>
+            href &&
+            href.startsWith("/wiki/") &&
+            !href.includes(":") && // removes Category:, File:, etc.
+            !href.includes("#")
+          );
+
+        if (cardLinks.length === 0) {
+          throw new Error("No cards found");
+        }
 
         status.textContent = "Picking a random card...";
-        let randomPage = allPages[Math.floor(Math.random() * allPages.length)];
 
-        window.location.href = "https://www.sekaipedia.org/wiki/" + encodeURIComponent(randomPage.title);
+        let random = cardLinks[Math.floor(Math.random() * cardLinks.length)];
+
+        window.location.href = "https://www.sekaipedia.org" + random;
 
       } catch (e) {
-        status.textContent = "Error loading cards 😢";
         console.error(e);
+        status.textContent = "Error 😢 (try again)";
       }
     }
   </script>
