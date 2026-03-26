@@ -57,9 +57,25 @@
   let allPages = [];
   let cmcontinue = "";
 
+  const proxies = [
+    "https://corsproxy.io/?",
+    "https://thingproxy.freeboard.io/fetch/"
+  ];
+
+  async function fetchWithProxy(url) {
+    for (let proxy of proxies) {
+      try {
+        let res = await fetch(proxy + encodeURIComponent(url));
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn("Proxy failed:", proxy);
+      }
+    }
+    throw new Error("All proxies failed");
+  }
+
   do {
     let base = "https://www.sekaipedia.org/api.php";
-    let proxy = "https://api.allorigins.win/raw?url=";
 
     let fullUrl = base + "?" + new URLSearchParams({
       action: "query",
@@ -70,13 +86,7 @@
       ...(cmcontinue && { cmcontinue })
     });
 
-    let res = await fetch(proxy + encodeURIComponent(fullUrl));
-
-    if (!res.ok) {
-      throw new Error("HTTP error " + res.status);
-    }
-
-    let data = await res.json();
+    let data = await fetchWithProxy(fullUrl);
 
     if (!data.query) {
       throw new Error("Invalid API response");
