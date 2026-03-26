@@ -29,41 +29,52 @@
   <p id="status"></p>
 
   <script>
+    // In-memory cache for card links
+    let cardLinksCache = null;
+
     async function go() {
       const status = document.getElementById("status");
-      status.textContent = "Loading card list...";
 
       try {
-        // Fetch the full list page (HTML, not API → no CORS block)
-        let res = await fetch("https://corsproxy.io/?https://www.sekaipedia.org/wiki/List_of_cards");
-        let html = await res.text();
+        // If cache exists, skip fetching
+        if (!cardLinksCache) {
+          status.textContent = "Loading card list...";
 
-        // Parse HTML
-        let parser = new DOMParser();
-        let doc = parser.parseFromString(html, "text/html");
+          // Fetch the full list page via a reliable CORS proxy
+          let res = await fetch("https://corsproxy.io/?https://www.sekaipedia.org/wiki/List_of_cards");
+          let html = await res.text();
 
-        // Get all links
-        let links = [...doc.querySelectorAll("a")];
+          // Parse HTML
+          let parser = new DOMParser();
+          let doc = parser.parseFromString(html, "text/html");
 
-        // Filter valid card links
-        let cardLinks = links
-          .map(a => a.getAttribute("href"))
-          .filter(href =>
-            href &&
-            href.startsWith("/wiki/") &&
-            !href.includes(":") && // removes Category:, File:, etc.
-            !href.includes("#")
-          );
+          // Get all links
+          let links = [...doc.querySelectorAll("a")];
 
-        if (cardLinks.length === 0) {
-          throw new Error("No cards found");
+          // Filter valid card links
+          cardLinksCache = links
+            .map(a => a.getAttribute("href"))
+            .filter(href =>
+              href &&
+              href.startsWith("/wiki/") &&
+              !href.includes(":") && // removes Category:, File:, etc.
+              !href.includes("#")
+            );
+
+          if (cardLinksCache.length === 0) {
+            throw new Error("No cards found");
+          }
         }
 
+        // Pick random card
         status.textContent = "Picking a random card...";
+        let random = cardLinksCache[Math.floor(Math.random() * cardLinksCache.length)];
 
-        let random = cardLinks[Math.floor(Math.random() * cardLinks.length)];
+        // Open in new tab
+        window.open("https://www.sekaipedia.org" + random, "_blank");
 
-        window.location.href = "https://www.sekaipedia.org" + random;
+        // Reset status message
+        status.textContent = "";
 
       } catch (e) {
         console.error(e);
