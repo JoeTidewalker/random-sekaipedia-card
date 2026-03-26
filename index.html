@@ -54,52 +54,48 @@
   }
 
   async function fetchAllCards() {
-    let allPages = [];
-    let cmcontinue = "";
+  let allPages = [];
+  let cmcontinue = "";
 
-    do {
-      let url = new URL("https://www.sekaipedia.org/api.php");
-      url.search = new URLSearchParams({
-        action: "query",
-        list: "categorymembers",
-        cmtitle: "Category:Cards",
-        cmlimit: "500",
-        format: "json",
-        origin: "*",
-        ...(cmcontinue && { cmcontinue })
-      });
+  do {
+    let base = "https://www.sekaipedia.org/api.php";
+    let proxy = "https://api.allorigins.win/raw?url=";
 
-      let res = await fetch(url, {
-        method: "GET",
-        headers: {
-          "Accept": "application/json"
-        }
-      });
+    let fullUrl = base + "?" + new URLSearchParams({
+      action: "query",
+      list: "categorymembers",
+      cmtitle: "Category:Cards",
+      cmlimit: "500",
+      format: "json",
+      ...(cmcontinue && { cmcontinue })
+    });
 
-      if (!res.ok) {
-        throw new Error("HTTP error " + res.status);
-      }
+    let res = await fetch(proxy + encodeURIComponent(fullUrl));
 
-      let data = await res.json();
-
-      if (!data.query) {
-        throw new Error("Invalid API response");
-      }
-
-      allPages.push(...data.query.categorymembers);
-      cmcontinue = data.continue ? data.continue.cmcontinue : "";
-
-    } while (cmcontinue);
-
-    if (allPages.length === 0) {
-      throw new Error("No pages found");
+    if (!res.ok) {
+      throw new Error("HTTP error " + res.status);
     }
 
-    localStorage.setItem(CACHE_KEY, JSON.stringify(allPages));
-    localStorage.setItem(CACHE_TIME_KEY, Date.now());
+    let data = await res.json();
 
-    return allPages;
+    if (!data.query) {
+      throw new Error("Invalid API response");
+    }
+
+    allPages.push(...data.query.categorymembers);
+    cmcontinue = data.continue ? data.continue.cmcontinue : "";
+
+  } while (cmcontinue);
+
+  if (allPages.length === 0) {
+    throw new Error("No pages found");
   }
+
+  localStorage.setItem(CACHE_KEY, JSON.stringify(allPages));
+  localStorage.setItem(CACHE_TIME_KEY, Date.now());
+
+  return allPages;
+}
 
   async function getCards() {
     const status = document.getElementById("status");
