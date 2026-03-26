@@ -38,92 +38,122 @@
   <p id="cacheInfo"></p>
 
   <script>
-    const CACHE_KEY = "sekaipedia_cards_cache";
-    const CACHE_TIME_KEY = "sekaipedia_cards_cache_time";
+  const CACHE_KEY = "sekaipedia_cards_cache";
+  const CACHE_TIME_KEY = "sekaipedia_cards_cache_time";
 
-    function updateCacheInfo() {
-      const cacheTime = localStorage.getItem(CACHE_TIME_KEY);
-      const info = document.getElementById("cacheInfo");
+  function updateCacheInfo() {
+    const cacheTime = localStorage.getItem(CACHE_TIME_KEY);
+    const info = document.getElementById("cacheInfo");
 
-      if (cacheTime) {
-        let date = new Date(parseInt(cacheTime));
-        info.textContent = "Cache last updated: " + date.toLocaleString();
-      } else {
-        info.textContent = "No cache stored.";
+    if (cacheTime) {
+      let date = new Date(parseInt(cacheTime));
+      info.textContent = "Cache last updated: " + date.toLocaleString();
+    } else {
+      info.textContent = "No cache stored.";
+    }
+  }
+
+  async function fetchAllCards() {
+    let allPages = [];
+    let cmcontinue = "";
+
+    do {
+      let url = new URL("https://www.sekaipedia.org/api.php");
+      url.search = new URLSearchParams({
+        action: "query",
+        list: "categorymembers",
+        cmtitle: "Category:Cards",
+        cmlimit: "500",
+        format: "json",
+        origin: "*",
+        ...(cmcontinue && { cmcontinue })
+      });
+
+      let res = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Accept": "application/json"
+        }
+      });
+
+      if (!res.ok) {
+        throw new Error("HTTP error " + res.status);
       }
-    }
 
-    async function fetchAllCards() {
-      let allPages = [];
-      let cmcontinue = "";
+      let data = await res.json();
 
-      do {
-        let url = `https://www.sekaipedia.org/api.php?action=query&list=categorymembers&cmtitle=Category:Cards&cmlimit=500&format=json&origin=*${cmcontinue ? "&cmcontinue=" + cmcontinue : ""}`;
-        let res = await fetch(url);
-        let data = await res.json();
-
-        allPages.push(...data.query.categorymembers);
-        cmcontinue = data.continue ? data.continue.cmcontinue : "";
-
-      } while (cmcontinue);
-
-      localStorage.setItem(CACHE_KEY, JSON.stringify(allPages));
-      localStorage.setItem(CACHE_TIME_KEY, Date.now());
-
-      return allPages;
-    }
-
-    async function getCards() {
-      const status = document.getElementById("status");
-      let cache = localStorage.getItem(CACHE_KEY);
-
-      if (cache) {
-        status.textContent = "Using cached cards...";
-        return JSON.parse(cache);
-      } else {
-        status.textContent = "Fetching cards from wiki...";
-        return await fetchAllCards();
+      if (!data.query) {
+        throw new Error("Invalid API response");
       }
+
+      allPages.push(...data.query.categorymembers);
+      cmcontinue = data.continue ? data.continue.cmcontinue : "";
+
+    } while (cmcontinue);
+
+    if (allPages.length === 0) {
+      throw new Error("No pages found");
     }
 
-    async function getRandomCard() {
-      const status = document.getElementById("status");
+    localStorage.setItem(CACHE_KEY, JSON.stringify(allPages));
+    localStorage.setItem(CACHE_TIME_KEY, Date.now());
 
-      try {
-        let pages = await getCards();
-        status.textContent = "Picking a random card...";
+    return allPages;
+  }
 
-        let randomPage = pages[Math.floor(Math.random() * pages.length)];
-        window.location.href = "https://www.sekaipedia.org/wiki/" + encodeURIComponent(randomPage.title);
+  async function getCards() {
+    const status = document.getElementById("status");
+    let cache = localStorage.getItem(CACHE_KEY);
 
-      } catch (e) {
-        status.textContent = "Error 😢";
-        console.error(e);
-      }
+    if (cache) {
+      status.textContent = "Using cached cards...";
+      return JSON.parse(cache);
+    } else {
+      status.textContent = "Fetching cards from wiki...";
+      return await fetchAllCards();
     }
+  }
 
-    async function refreshCache() {
-      const status = document.getElementById("status");
-      status.textContent = "Refreshing cache...";
+  async function getRandomCard() {
+    const status = document.getElementById("status");
 
-      try {
-        await fetchAllCards();
-        status.textContent = "Cache refreshed!";
-        updateCacheInfo();
-      } catch (e) {
-        status.textContent = "Error refreshing cache 😢";
-      }
+    try {
+      let pages = await getCards();
+      status.textContent = "Picking a random card...";
+
+      let randomPage = pages[Math.floor(Math.random() * pages.length)];
+
+      window.location.href = "https://www.sekaipedia.org/wiki/" + encodeURIComponent(randomPage.title);
+
+    } catch (e) {
+      console.error(e);
+      status.textContent = "Error 😢 (check console)";
     }
+  }
 
-    function clearCache() {
-      localStorage.removeItem(CACHE_KEY);
-      localStorage.removeItem(CACHE_TIME_KEY);
-      document.getElementById("status").textContent = "Cache cleared.";
+  async function refreshCache() {
+    const status = document.getElementById("status");
+    status.textContent = "Refreshing cache...";
+
+    try {
+      await fetchAllCards();
+      status.textContent = "Cache refreshed!";
       updateCacheInfo();
+    } catch (e) {
+      console.error(e);
+      status.textContent = "Error refreshing cache 😢 (check console)";
     }
+  }
 
+  function clearCache() {
+    localStorage.removeItem(CACHE_KEY);
+    localStorage.removeItem(CACHE_TIME_KEY);
+    document.getElementById("status").textContent = "Cache cleared.";
     updateCacheInfo();
-  </script>
+  }
+
+  updateCacheInfo();
+</script>
 
 </body>
 </html>
